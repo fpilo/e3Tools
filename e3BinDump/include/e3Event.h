@@ -21,12 +21,7 @@ const double STRIPGAP=0.7;       //Distanza tra due strip contigue in cm.
 const double SIGNALSPEED=16.4;   //Velocita' del segnale lungo la strip in cm/ns
 //FARE UN INCLUDE FILE - NAMESPACE DI TUTTE QUESTE VARIABILI!!!!
 
-class e3GPSData;            //0x0
 class e3RawEvent;           //0x1 or 0x2
-class e3SORData;            //0x3
-class e3GEOData;            //0x5
-class e3WADData;           //0x6
-class e3VWSData;           //0x7
 
 struct sData {
   unsigned int dummy : 27;
@@ -39,41 +34,6 @@ enum dataType {
   GEO=0x5,
   WAD=0x6,
   VWS=0x7
-};
-
-class e3DataBlock : public TObject {
-
- private:
-
-  unsigned int _vLevel;
-  ifstream *_inFile;
-  char _buffer[BUFSIZE];
-  unsigned int _offSet;
-  int _blockSize, _dataType;
-  char *_evntBlock, *_sngBlock;
-  sData _data;
-  string _dtFilterStr;
-
- public:
-
-  e3DataBlock(){ _vLevel = 0; _dtFilterStr="GPS!EV1|EV2|SOR|GEO|WAD|VWS"; }
-  int openBinFile(ifstream *);
-  void closeBinFile(){};
-  int getBinData(char *, unsigned int);
-  int getBlockData(char *&, unsigned int, unsigned int offSet = 0);
-  int getGPSData(e3GPSData *);
-  int getSORData(e3SORData *);
-  int getGEOData(e3GEOData *);
-  int getWADData(e3WADData *);
-  int getVWSData(e3VWSData *);
-  int getNextBlock();
-  int getNextEvent(e3RawEvent *);
-  void dump(char *, unsigned int, unsigned int);
-
-  inline void setVerbosityLevel(unsigned int vLevel){ _vLevel = vLevel; }
-  inline void setDTFilter(string dtFilterStr){ _dtFilterStr=dtFilterStr; }
-
-  ClassDef(e3DataBlock,1)
 };
 
 class e3GPSData : public TObject {
@@ -276,6 +236,50 @@ class e3VWSData : public TObject {
   inline float getSlBarometer(void){ return _slBarometer; }
 
   ClassDef(e3VWSData,1)
+};
+
+class e3DataBlock : public TObject {
+
+ private:
+
+  unsigned int _vLevel;
+  string _inFileName;
+  ifstream *_inFile;
+  char _buffer[BUFSIZE];
+  unsigned int _offSet;
+  int _blockSize, _dataType;
+  char *_evntBlock, *_sngBlock;
+  sData _data;
+  string _dtFilterStr;
+  bool _specialDump;
+
+ public:
+
+  e3SORData sorData;
+  e3GEOData geoData;
+  e3WADData wadData;
+  e3VWSData vwsData;
+
+  e3DataBlock(){ _vLevel = 0; _dtFilterStr="GPS!EV1|EV2|SOR|GEO|WAD|VWS";  _specialDump=false; }
+  inline void setInFileName(string inFileName){ _inFileName = inFileName; }
+  int openBinFile(ifstream *);
+  void closeBinFile(){};
+  int getBinData(char *, unsigned int);
+  int getBlockData(char *&, unsigned int, unsigned int offSet = 0);
+  int getGPSData(e3GPSData *);
+  int getSORData(void);
+  int getGEOData(void);
+  int getWADData(void);
+  int getVWSData(void);
+  int getNextBlock();
+  int getNextEvent(e3RawEvent *);
+  void dump(char *, unsigned int, unsigned int);
+
+  inline void setVerbosityLevel(unsigned int vLevel){ _vLevel = vLevel; }
+  inline void setDTFilter(string dtFilterStr){ _dtFilterStr=dtFilterStr; }
+  inline void setSpecialDump(bool specialDump){ _specialDump=specialDump; }
+
+  ClassDef(e3DataBlock,1)
 };
 
 struct sGlobalHeader {

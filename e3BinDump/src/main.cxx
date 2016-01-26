@@ -21,6 +21,7 @@ enum STATUS {
 int VLEVEL;
 string BFNAME;
 string DTSTR;
+bool SPECIALDUMP;
 int BLKSTOREAD;
 
 int GetUserOpt(int, char**);
@@ -46,6 +47,7 @@ int main(int argc, char **argv)
   
   VLEVEL = 0;
   DTSTR="";
+  SPECIALDUMP=false;
   BLKSTOREAD=numeric_limits<int>::max();
 
   //======================================== 
@@ -67,7 +69,9 @@ int main(int argc, char **argv)
   
   if(VLEVEL>0) _e3DataBlock.setVerbosityLevel(VLEVEL);
   if(!DTSTR.empty()) _e3DataBlock.setDTFilter(DTSTR);
+  if(SPECIALDUMP) _e3DataBlock.setSpecialDump(true);
 
+  _e3DataBlock.setInFileName(BFNAME.c_str());
   _inFile.open(BFNAME.c_str(), ios_base::in | ios_base::binary);  
   _e3DataBlock.openBinFile(&_inFile);
 
@@ -76,11 +80,11 @@ int main(int argc, char **argv)
     _ret=_e3DataBlock.getNextBlock();
     if(!_ret) _readBlocks++;
     else if(_ret==1){
-      cout<<"[WARNING] Read Blocks returned: "<<_ret<<". End of file reached. Total analysed blocks: "<<_readBlocks<<endl;
+      if(!SPECIALDUMP) cout<<"[e3BinDump.exe - WARNING] Read Blocks returned: "<<_ret<<" - End of file reached. Total analysed blocks: "<<_readBlocks<<endl;
       exit(EXIT_SUCCESS);
     }
     else{
-      cout<<"[ERROR] Read Blocks returned: "<<_ret<<". Exiting ..."<<endl;
+      cerr<<"[e3BinDump.exe - ERROR] Read Blocks returned: "<<_ret<<". Exiting ..."<<endl;
       exit(EXIT_FAILURE);
     }  
   }
@@ -102,13 +106,14 @@ int GetUserOpt(int argc, char* argv[]){
   //opt->setVerbose();                          // print warnings about unknown options
   //opt->autoUsagePrint(false);                 // print usage for bad options
 
-  opt->addUsage( "Usage: e3Viewer.exe [options] [arguments]" );
+  opt->addUsage( "Usage: e3BinDump.exe [options] [arguments]" );
   opt->addUsage( "" );
   opt->addUsage( "Options: " );
   opt->addUsage( "" );
-  opt->addUsage( "  -h, --help               Print this help " );
-  opt->addUsage( "  -v, --verbose <vlevel>   Change verbosity level" );
-  opt->addUsage( "  -d, --data-type <datatypestr>   Dump only specific data block type" );
+  opt->addUsage( "  -h, --help                                    Print this help " );
+  opt->addUsage( "  -v, --verbose <vlevel>             Change verbosity level" );
+  opt->addUsage( "  -d, --data-type <datatypestr>  Dump only specific data block type" );
+  opt->addUsage( "  -s, --special-dump                    Special dump used to update e3RunDB" );
   opt->addUsage( "" );
   opt->addUsage( "Arguments: " );
   opt->addUsage( "  dstPath          DST files absolute path" );
@@ -120,12 +125,13 @@ int GetUserOpt(int argc, char* argv[]){
   opt->setFlag( "help", 'h' );  
   opt->setOption( "verbose", 'v' );
   opt->setOption( "data-type", 'd' );
+  opt->setFlag( "special", 's' );
 
   opt->processCommandArgs( argc, argv );      // go through the command line and get the options 
 
   if( ! opt->hasOptions()) {                  // print usage if no options 
-    cout<<"[e3Viewer.exe - WARNING] No options specified. Using default values ..."<<endl;
-    // cout<<"[e3Viewer.exe - WARNING] No options specified. Type 'e3Viewer.exe --help' for usage. Exiting ..."<<endl;
+    cout<<"[e3BinDump.exe - WARNING] No options specified. Using default values ..."<<endl;
+    // cout<<"[e3BinDump.exe - WARNING] No options specified. Type 'e3BinDump.exe --help' for usage. Exiting ..."<<endl;
     // delete opt;
     // return BAD_STAT;
   }
@@ -143,6 +149,10 @@ int GetUserOpt(int argc, char* argv[]){
     DTSTR=opt->getValue( "data-type" ); 
   }
 
+  if( opt->getFlag( "special" ) || opt->getFlag( 's' ) ){  
+    SPECIALDUMP=true;
+  }
+
   switch(opt->getArgc()){                                   //get the actual arguments after the options
     
   case 2: 
@@ -156,7 +166,7 @@ int GetUserOpt(int argc, char* argv[]){
 
   default:
     delete opt;
-    cout<<"[e3Viewer.exe - WARNING] No arguments specified. Using default settings. Type 'e3Viewer.exe --help' for usage."<<endl;
+    cout<<"[e3BinDump.exe - WARNING] No arguments specified. Using default settings. Type 'e3BinDump.exe --help' for usage."<<endl;
     return OK_STAT;
     break;
   }

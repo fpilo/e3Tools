@@ -1,3 +1,4 @@
+#include <cstring>
 #include <algorithm>
 
 #include "e3Event.h"
@@ -352,7 +353,7 @@ int e3DataBlock::openBinFile(ifstream *inFile){
       
     //Check on block size
     if(byteSize > BUFSIZE) {
-      cout<<"[e3DataBlock::openBinFile - ERROR] Data block size too big: "<<byteSize<<" bytes."<<endl;
+      cerr<<"[e3DataBlock::openBinFile - ERROR] Data block size too big: "<<byteSize<<" bytes."<<endl;
       return 3;
     }
     else{
@@ -380,7 +381,7 @@ int e3DataBlock::openBinFile(ifstream *inFile){
             
     //Check on block size
     if((_blockSize-2)*4 > BUFSIZE) {
-      cout<<"[e3DataBlock::openBinFile - ERROR] Data block size too big: "<<(_blockSize-2)*4<<" bytes."<<endl;
+      cerr<<"[e3DataBlock::openBinFile - ERROR] Data block size too big: "<<(_blockSize-2)*4<<" bytes."<<endl;
       return 3;
     }
 
@@ -455,21 +456,21 @@ int e3DataBlock::getGPSData(e3GPSData *gpsData){
 //---------------------------------------------------------
 // e3DataBlock getSORData method
 //---------------------------------------------------------
-int e3DataBlock::getSORData(e3SORData *sorData){
+int e3DataBlock::getSORData(){
 
   if(_vLevel>=5) dump(_sngBlock, (_blockSize-2)*4, _dataType);
 
-  sorData->setEdgeDetectionMode((int) _sngBlock[3]|_sngBlock[2]|_sngBlock[1]|_sngBlock[0]); 
-  sorData->setEdgeTimeResolution((int) _sngBlock[7]|_sngBlock[6]|_sngBlock[5]|_sngBlock[4]); 
-  sorData->setPulseWidthResolution((int) _sngBlock[11]|_sngBlock[10]|_sngBlock[9]|_sngBlock[8]); 
-  sorData->setMaxTime1((int) _sngBlock[15]|_sngBlock[14]|_sngBlock[13]|_sngBlock[12]); 
-  sorData->setMaxTime2((int) _sngBlock[19]|_sngBlock[18]|_sngBlock[17]|_sngBlock[16]); 
+  sorData.setEdgeDetectionMode((int) _sngBlock[3]|_sngBlock[2]|_sngBlock[1]|_sngBlock[0]); 
+  sorData.setEdgeTimeResolution((int) _sngBlock[7]|_sngBlock[6]|_sngBlock[5]|_sngBlock[4]); 
+  sorData.setPulseWidthResolution((int) _sngBlock[11]|_sngBlock[10]|_sngBlock[9]|_sngBlock[8]); 
+  sorData.setMaxTime1((int) _sngBlock[15]|_sngBlock[14]|_sngBlock[13]|_sngBlock[12]); 
+  sorData.setMaxTime2((int) _sngBlock[19]|_sngBlock[18]|_sngBlock[17]|_sngBlock[16]); 
 
   for(unsigned int iword=5; iword<_blockSize-5; iword++){
-    sorData->setComments(_sngBlock[iword*4+3]);
-    sorData->setComments(_sngBlock[iword*4+2]);
-    sorData->setComments(_sngBlock[iword*4+1]);
-    sorData->setComments(_sngBlock[iword*4+0]);
+    sorData.setComments(_sngBlock[iword*4+3]);
+    sorData.setComments(_sngBlock[iword*4+2]);
+    sorData.setComments(_sngBlock[iword*4+1]);
+    sorData.setComments(_sngBlock[iword*4+0]);
   }
 
   return 0;
@@ -479,31 +480,31 @@ int e3DataBlock::getSORData(e3SORData *sorData){
 //---------------------------------------------------------
 // e3DataBlock getGEOData method
 //---------------------------------------------------------
-int e3DataBlock::getGEOData(e3GEOData *geoData){
+int e3DataBlock::getGEOData(){
 
   if(_vLevel>=5) dump(_sngBlock, (_blockSize-2)*4, _dataType);
 
-  geoData->setGrAngle((double) (((_sngBlock[3]&0xff)<<24)|((_sngBlock[2]&0xff)<<16)|((_sngBlock[1]&0xff)<<8)|(_sngBlock[0]&0xff))/100.);
-  geoData->setDist12((double) (((_sngBlock[7]&0xff)<<24)|((_sngBlock[6]&0xff)<<16)|((_sngBlock[5]&0xff)<<8)|(_sngBlock[4]&0xff))/100.);
-  geoData->setDist23((double) (((_sngBlock[11]&0xff)<<24)|((_sngBlock[10]&0xff)<<16)|((_sngBlock[9]&0xff)<<8)|(_sngBlock[8]&0xff))/100.);
+  geoData.setGrAngle((double) (((_sngBlock[3]&0xff)<<24)|((_sngBlock[2]&0xff)<<16)|((_sngBlock[1]&0xff)<<8)|(_sngBlock[0]&0xff))/100.);
+  geoData.setDist12((double) (((_sngBlock[7]&0xff)<<24)|((_sngBlock[6]&0xff)<<16)|((_sngBlock[5]&0xff)<<8)|(_sngBlock[4]&0xff))/100.);
+  geoData.setDist23((double) (((_sngBlock[11]&0xff)<<24)|((_sngBlock[10]&0xff)<<16)|((_sngBlock[9]&0xff)<<8)|(_sngBlock[8]&0xff))/100.);
 
   for(unsigned int iMRPC=0; iMRPC<3; iMRPC++){
     for(unsigned int iSide=0; iSide<2; iSide++){
 
-      geoData->setCableLen(iMRPC,iSide,(double) (((_sngBlock[12+3+iMRPC*4+iSide*4]&0xff)<<24)|((_sngBlock[12+2+iMRPC*4+iSide*4]&0xff)<<16)|((_sngBlock[12+1+iMRPC*4+iSide*4]&0xff)<<8)|(_sngBlock[12+0+iMRPC*4+iSide*4]&0xff))/100.);
-      geoData->setFecType(iMRPC,iSide,(double) (((_sngBlock[36+3+iMRPC*4+iSide*4]&0xff)<<24)|((_sngBlock[36+2+iMRPC*4+iSide*4]&0xff)<<16)|((_sngBlock[36+1+iMRPC*4+iSide*4]&0xff)<<8)|(_sngBlock[36+0+iMRPC*4+iSide*4]&0xff)));
+      geoData.setCableLen(iMRPC,iSide,(double) (((_sngBlock[12+3+iMRPC*4+iSide*4]&0xff)<<24)|((_sngBlock[12+2+iMRPC*4+iSide*4]&0xff)<<16)|((_sngBlock[12+1+iMRPC*4+iSide*4]&0xff)<<8)|(_sngBlock[12+0+iMRPC*4+iSide*4]&0xff))/100.);
+      geoData.setFecType(iMRPC,iSide,(double) (((_sngBlock[36+3+iMRPC*4+iSide*4]&0xff)<<24)|((_sngBlock[36+2+iMRPC*4+iSide*4]&0xff)<<16)|((_sngBlock[36+1+iMRPC*4+iSide*4]&0xff)<<8)|(_sngBlock[36+0+iMRPC*4+iSide*4]&0xff)));
 
     }
   }
 
   //STATION ID
-  geoData->setStationID(((_sngBlock[15*4+3]&0xff)<<24)|((_sngBlock[15*4+2]&0xff)<<16)|((_sngBlock[15*4+1]&0xff)<<8)|(_sngBlock[15*4+0]&0xff));
+  geoData.setStationID(((_sngBlock[15*4+3]&0xff)<<24)|((_sngBlock[15*4+2]&0xff)<<16)|((_sngBlock[15*4+1]&0xff)<<8)|(_sngBlock[15*4+0]&0xff));
 
   //STATION REGION
-  geoData->setStationReg(_sngBlock[16*4+3]);
-  geoData->setStationReg(_sngBlock[16*4+2]);
-  geoData->setStationReg(_sngBlock[16*4+1]);
-  geoData->setStationReg(_sngBlock[16*4+0]);
+  geoData.setStationReg(_sngBlock[16*4+3]);
+  geoData.setStationReg(_sngBlock[16*4+2]);
+  geoData.setStationReg(_sngBlock[16*4+1]);
+  geoData.setStationReg(_sngBlock[16*4+0]);
 
   return 0;
 
@@ -512,17 +513,17 @@ int e3DataBlock::getGEOData(e3GEOData *geoData){
 //---------------------------------------------------------
 // e3DataBlock getWADData method
 //---------------------------------------------------------
-int e3DataBlock::getWADData(e3WADData *wadData){
+int e3DataBlock::getWADData(){
 
   if(_vLevel>=5) dump(_sngBlock, (_blockSize-2)*4, _dataType);
 
-  wadData->setWindowWidth(((_sngBlock[0*4+3]&0xff)<<24)|((_sngBlock[0*4+2]&0xff)<<16)|((_sngBlock[0*4+1]&0xff)<<8)|(_sngBlock[0*4+0]&0xff));
-  wadData->setWindowOffset(((_sngBlock[1*4+3]&0xff)<<24)|((_sngBlock[1*4+2]&0xff)<<16)|((_sngBlock[1*4+1]&0xff)<<8)|(_sngBlock[1*4+0]&0xff));
-  wadData->setSearchMargin(((_sngBlock[2*4+3]&0xff)<<24)|((_sngBlock[2*4+2]&0xff)<<26)|((_sngBlock[2*4+1]&0xff)<<8)|(_sngBlock[2*4+0]&0xff));
-  wadData->setRejectMargin(((_sngBlock[3*4+3]&0xff)<<24)|((_sngBlock[3*4+2]&0xff)<<26)|((_sngBlock[3*4+1]&0xff)<<8)|(_sngBlock[3*4+0]&0xff));
+  wadData.setWindowWidth(((_sngBlock[0*4+3]&0xff)<<24)|((_sngBlock[0*4+2]&0xff)<<16)|((_sngBlock[0*4+1]&0xff)<<8)|(_sngBlock[0*4+0]&0xff));
+  wadData.setWindowOffset(((_sngBlock[1*4+3]&0xff)<<24)|((_sngBlock[1*4+2]&0xff)<<16)|((_sngBlock[1*4+1]&0xff)<<8)|(_sngBlock[1*4+0]&0xff));
+  wadData.setSearchMargin(((_sngBlock[2*4+3]&0xff)<<24)|((_sngBlock[2*4+2]&0xff)<<26)|((_sngBlock[2*4+1]&0xff)<<8)|(_sngBlock[2*4+0]&0xff));
+  wadData.setRejectMargin(((_sngBlock[3*4+3]&0xff)<<24)|((_sngBlock[3*4+2]&0xff)<<26)|((_sngBlock[3*4+1]&0xff)<<8)|(_sngBlock[3*4+0]&0xff));
 
-  wadData->setDelayBetTrgAndCrst(((_sngBlock[4*4+3]&0xff)<<24)|((_sngBlock[4*4+2]&0xff)<<26)|((_sngBlock[4*4+1]&0xff)<<8)|(_sngBlock[4*4+0]&0xff));
-  wadData->setTriggerSub(((_sngBlock[5*4+3]&0xff)<<24)|((_sngBlock[5*4+2]&0xff)<<26)|((_sngBlock[5*4+1]&0xff)<<8)|(_sngBlock[5*4+0]&0xff));
+  wadData.setDelayBetTrgAndCrst(((_sngBlock[4*4+3]&0xff)<<24)|((_sngBlock[4*4+2]&0xff)<<26)|((_sngBlock[4*4+1]&0xff)<<8)|(_sngBlock[4*4+0]&0xff));
+  wadData.setTriggerSub(((_sngBlock[5*4+3]&0xff)<<24)|((_sngBlock[5*4+2]&0xff)<<26)|((_sngBlock[5*4+1]&0xff)<<8)|(_sngBlock[5*4+0]&0xff));
 
   return 0;
 
@@ -531,19 +532,19 @@ int e3DataBlock::getWADData(e3WADData *wadData){
 //---------------------------------------------------------
 // e3DataBlock getVWSData method
 //---------------------------------------------------------
-int e3DataBlock::getVWSData(e3VWSData *vwsData){
+int e3DataBlock::getVWSData(){
 
   if(_vLevel>=5) dump(_sngBlock, (_blockSize-2)*4, _dataType);
 
-  vwsData->setYear(((_sngBlock[0*4+3]&0xff)<<24)|((_sngBlock[0*4+2]&0xff)<<16)|((_sngBlock[0*4+1]&0xff)<<8)|(_sngBlock[0*4+0]&0xff));
-  vwsData->setMonth(((_sngBlock[1*4+3]&0xff)<<24)|((_sngBlock[1*4+2]&0xff)<<16)|((_sngBlock[1*4+1]&0xff)<<8)|(_sngBlock[1*4+0]&0xff));
-  vwsData->setDay(((_sngBlock[2*4+3]&0xff)<<24)|((_sngBlock[2*4+2]&0xff)<<26)|((_sngBlock[2*4+1]&0xff)<<8)|(_sngBlock[2*4+0]&0xff));
-  vwsData->setHours(((_sngBlock[3*4+3]&0xff)<<24)|((_sngBlock[3*4+2]&0xff)<<26)|((_sngBlock[3*4+1]&0xff)<<8)|(_sngBlock[3*4+0]&0xff));
-  vwsData->setMinutes(((_sngBlock[4*4+3]&0xff)<<24)|((_sngBlock[4*4+2]&0xff)<<26)|((_sngBlock[4*4+1]&0xff)<<8)|(_sngBlock[4*4+0]&0xff));
+  vwsData.setYear(((_sngBlock[0*4+3]&0xff)<<24)|((_sngBlock[0*4+2]&0xff)<<16)|((_sngBlock[0*4+1]&0xff)<<8)|(_sngBlock[0*4+0]&0xff));
+  vwsData.setMonth(((_sngBlock[1*4+3]&0xff)<<24)|((_sngBlock[1*4+2]&0xff)<<16)|((_sngBlock[1*4+1]&0xff)<<8)|(_sngBlock[1*4+0]&0xff));
+  vwsData.setDay(((_sngBlock[2*4+3]&0xff)<<24)|((_sngBlock[2*4+2]&0xff)<<26)|((_sngBlock[2*4+1]&0xff)<<8)|(_sngBlock[2*4+0]&0xff));
+  vwsData.setHours(((_sngBlock[3*4+3]&0xff)<<24)|((_sngBlock[3*4+2]&0xff)<<26)|((_sngBlock[3*4+1]&0xff)<<8)|(_sngBlock[3*4+0]&0xff));
+  vwsData.setMinutes(((_sngBlock[4*4+3]&0xff)<<24)|((_sngBlock[4*4+2]&0xff)<<26)|((_sngBlock[4*4+1]&0xff)<<8)|(_sngBlock[4*4+0]&0xff));
 
-  vwsData->setIndoorTemperature((float) (((_sngBlock[5*4+3]&0xff)<<24)|((_sngBlock[5*4+2]&0xff)<<26)|((_sngBlock[5*4+1]&0xff)<<8)|(_sngBlock[5*4+0]&0xff))/100.);
-  vwsData->setOutdoorTemperature((float) (((_sngBlock[6*4+3]&0xff)<<24)|((_sngBlock[6*4+2]&0xff)<<26)|((_sngBlock[6*4+1]&0xff)<<8)|(_sngBlock[6*4+0]&0xff))/100.);
-  vwsData->setSlBarometer(((_sngBlock[7*4+3]&0xff)<<24)|((_sngBlock[7*4+2]&0xff)<<26)|((_sngBlock[7*4+1]&0xff)<<8)|(_sngBlock[7*4+0]&0xff));
+  vwsData.setIndoorTemperature((float) (((_sngBlock[5*4+3]&0xff)<<24)|((_sngBlock[5*4+2]&0xff)<<26)|((_sngBlock[5*4+1]&0xff)<<8)|(_sngBlock[5*4+0]&0xff))/100.);
+  vwsData.setOutdoorTemperature((float) (((_sngBlock[6*4+3]&0xff)<<24)|((_sngBlock[6*4+2]&0xff)<<26)|((_sngBlock[6*4+1]&0xff)<<8)|(_sngBlock[6*4+0]&0xff))/100.);
+  vwsData.setSlBarometer(((_sngBlock[7*4+3]&0xff)<<24)|((_sngBlock[7*4+2]&0xff)<<26)|((_sngBlock[7*4+1]&0xff)<<8)|(_sngBlock[7*4+0]&0xff));
 
   return 0;
 
@@ -558,10 +559,6 @@ int e3DataBlock::getNextBlock(){
   unsigned int anBytes;
 
   e3GPSData _gpsData;
-  e3SORData _sorData;
-  e3GEOData _geoData;
-  e3WADData _wadData;
-  e3VWSData _vwsData;
     
   if(_vLevel>=5) cout<<"[e3DataBlock::getNextBlock - DEBUG] Buffer offset: "<<dec<<_offSet<<endl;
 
@@ -577,18 +574,18 @@ int e3DataBlock::getNextBlock(){
 
     //Check on block size
     if(_blockSize==0){
-      cout<<"[e3DataBlock::getNextBlock - WARNING] Data block size: 0 bytes."<<endl;
+      if(_vLevel>0) cout<<"[e3DataBlock::getNextBlock - WARNING] Data block size: 0 bytes."<<endl;
       return 1;
     }
 
     if((_blockSize-2)*4 > BUFSIZE) {
-      cout<<"[e3DataBlock::getNextBlock - ERROR] Data block size too big: "<<(_blockSize-2)*4<<" bytes."<<endl;
+      cerr<<"[e3DataBlock::getNextBlock - ERROR] Data block size too big: "<<(_blockSize-2)*4<<" bytes."<<endl;
       return 2;
     }
 
     //Check on data type
     if(_dataType<0x0 || _dataType>0x7){
-      cout<<"[e3DataBlock::getNextBlock - ERROR]  Found anomalous DT: 0x"<<hex<<_dataType<<dec<<endl;
+      cerr<<"[e3DataBlock::getNextBlock - ERROR]  Found anomalous DT: 0x"<<hex<<_dataType<<dec<<endl;
       return 3;
     }
 
@@ -610,7 +607,44 @@ int e3DataBlock::getNextBlock(){
 	
 	_gpsData.init();
 	getGPSData(&_gpsData);
-	_gpsData.dump();
+	if(!_specialDump) _gpsData.dump();
+	//	else if(_gpsData.getSecondsOfDay()-(int)(_gpsData.getSecondsOfDay()/60)*60==0) {       
+	else{
+
+	  //Dump only one GPS block per minute
+	  cout<<fixed;
+	  cout<<_inFileName<<",";
+	  cout.precision(6); cout<<_gpsData.getLatitudeDeg()+(float)((_gpsData.getLatitudeMin()+_gpsData.getLatitudeMinFrac()/1000.)/60.)<<",";
+	  cout.precision(6); cout<<_gpsData.getLongitudeDeg()+(float)((_gpsData.getLongitudeMin()+_gpsData.getLongitudeMinFrac()/1000.)/60.)<<",";
+	  cout.precision(0); cout<<_gpsData.getAltitude()<<",";
+	  cout.fill('0'); cout.width(3); cout.precision(2); cout<<geoData.getDist12()<<",";
+	  cout.fill('0'); cout.width(3); cout.precision(2); cout<<geoData.getDist23()<<",";
+	  cout.fill('0'); cout.width(4); cout.precision(1); cout<<geoData.getGrAngle()<<",";
+	  time_t loctime;
+	  struct tm timeinfo, *loctimeinfo;
+	  /* initialize timeinfo and modify it to the user's choice */
+	  bzero(&timeinfo, sizeof(struct tm));
+	  timeinfo.tm_isdst = -1;  /* Allow mktime to determine DST setting. */
+	  timeinfo.tm_mon   = 0;
+	  timeinfo.tm_mday = _gpsData.getDayOfYear();
+	  timeinfo.tm_year = _gpsData.getYear() - 1900;
+
+	  loctime = mktime (&timeinfo);
+	  loctimeinfo = localtime(&loctime);
+	  cout<<loctimeinfo->tm_year+1900<<"-"; 
+	  cout.fill('0'); cout.width(2); cout<<loctimeinfo->tm_mon+1<<"-";
+	  cout.fill('0'); cout.width(2); cout<<loctimeinfo->tm_mday<<",";
+	  cout.fill('0'); cout.width(2); cout<<(int)(_gpsData.getSecondsOfDay()/3600)<<":";
+	  cout.fill('0'); cout.width(2); cout<<(int)(_gpsData.getSecondsOfDay()/60)-(int)((_gpsData.getSecondsOfDay()/3600)*60)<<":";
+	  if(_gpsData.getNanoSeconds()>5E8){ cout.fill('0'); cout.width(2); cout<<_gpsData.getSecondsOfDay()-(int)(_gpsData.getSecondsOfDay()/60)*60+1; }
+	  else{ cout.fill('0'); cout.width(2); cout<<_gpsData.getSecondsOfDay()-(int)(_gpsData.getSecondsOfDay()/60)*60; }
+
+	  char *telID = (char*) geoData.getStationIDComp().c_str();
+	  for(int ichar=0; telID[ichar]; ichar++)
+	    telID[ichar]=toupper(telID[ichar]);
+	  cout<<","<<telID;
+	  cout<<endl;
+	}
 	
       }
 
@@ -629,9 +663,9 @@ int e3DataBlock::getNextBlock(){
 
 	if(_vLevel>=4) cout<<"[e3DataBlock::getNextBlock - INFO] New \"Start of Run\" BLOCK found."<<endl;
 	
-	_sorData.init();
-	getSORData(&_sorData);
-	_sorData.dump();
+	sorData.init();
+	getSORData();
+	if(!_specialDump) sorData.dump();
 
       }      
 
@@ -643,9 +677,9 @@ int e3DataBlock::getNextBlock(){
 
 	if(_vLevel>=4) cout<<"[e3DataBlock::getNextBlock - INFO] New \"Geometry\" BLOCK found."<<endl;
       
-	_geoData.init();
-	getGEOData(&_geoData);
-	_geoData.dump();
+	geoData.init();
+	getGEOData();
+	if(!_specialDump) geoData.dump();
 
       }
       
@@ -657,9 +691,9 @@ int e3DataBlock::getNextBlock(){
 
 	if(_vLevel>=4) cout<<"[e3DataBlock::getNextBlock - INFO] New \"Window and Delay\" BLOCK found."<<endl;
 	
-	_wadData.init();
-	getWADData(&_wadData);
-	_wadData.dump();
+	wadData.init();
+	getWADData();
+	if(!_specialDump) wadData.dump();
 
       }
 
@@ -671,9 +705,9 @@ int e3DataBlock::getNextBlock(){
 
 	if(_vLevel>=2) cout<<"[e3DataBlock::getNextBlock - INFO] New \"Weather Station\" BLOCK found."<<endl;
 	
-	_vwsData.init();
-	getVWSData(&_vwsData);
-	_vwsData.dump();
+	vwsData.init();
+	getVWSData();
+	if(!_specialDump) vwsData.dump();
 
       }
 
@@ -791,11 +825,11 @@ int e3DataBlock::getNextEvent(e3RawEvent *rawEvent){
 	  break;
 	  
 	case 0x04:        //TDC Error
-	  if(_vLevel>=1) cout<<"[e3DataBlock::getNextEvent - WARNING] Found error for TDC "<<dataType<<"!!!"<<endl;
+	  if(_vLevel>0) cout<<"[e3DataBlock::getNextEvent - WARNING] Found error for TDC "<<dataType<<"!!!"<<endl;
 	  break;
 	  
 	default:
-	  if(_vLevel>=1) cout<<"[e3DataBlock::getNextEvent - WARNING] Unknown type: 0x"<<hex<<_data.type<<endl;
+	  if(_vLevel>0) cout<<"[e3DataBlock::getNextEvent - WARNING] Unknown type: 0x"<<hex<<_data.type<<endl;
 	  break;
 	}
 	
