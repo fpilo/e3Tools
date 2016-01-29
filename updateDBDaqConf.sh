@@ -1,11 +1,14 @@
 #!/bin/bash
 #This utility loop into /data and create one row in a list for each *.bin file
-#v1.1
+#v1.4
 #
-#2016-01-12: awk script is now used to populate db entries list
-#2016-01-08: C++ e3BinDump tool is now used in place of Python script
-#2015-12-04: New logic to select analysis starting date.
-#2015-12-02: New control added when selecting starting date: analysis starts from first day with existing raw data.
+#2016-01-29 v1.4: bug fix: next available data is selected only if .bin data are available in the existing directory
+#2016-01-28 v1.3: bug fix: dbEntries file is no more created if List file is empty (TOTANFILE=0)
+#2016-01-26 v1.2: tmp files are moved to csv at the end to indicate that the process is ongoing
+#2016-01-12 v1.1: awk script is now used to populate db entries list
+#2016-01-08 v1.0: C++ e3BinDump tool is now used in place of Python script
+#2015-12-04 v0.1: New logic to select analysis starting date.
+#2015-12-02 v0.0: New control added when selecting starting date: analysis starts from first day with existing raw data.
 #
 #Created by: F. Pilo on 2015-11-30
 #Usage: bash updateDBDaqConf.sh ARG1 ARG2
@@ -30,6 +33,12 @@ CMD2="sort"
 CMD3="e3BinDump/e3BinDump.exe -s"
 CMD4="exe"
 
+if ls *.tmp > /dev/null 2>&1;
+then 
+    echo -e "\n[WARNING] TMP files found. Probably another process is still ongoing. Exiting ... "	
+    exit
+fi
+touch exec.tmp
 rm -f *.csv
 
 if [[ -z "$E3BINDUMPENV" ]] 
@@ -101,59 +110,66 @@ BINDIRS0=$($CMD0 /data/ | $CMD2)
 if [[ ! -z $2 ]]
 then
     anDate=$2
-   echo -e "[INFO] Analysing day $anDate, if raw data exist."
+    echo -e "[INFO] Analysing day $anDate, if raw data exist."
 else
-for telID in $telList
-do
+    for telID in $telList
+    do
 	
 #    found=$($mysqlDB -N -B -e "select valid_until from daq_configurations join telescopes on telescope_id = telescopes.id where telescopes.name='$telID' order by valid_until desc limit 1 ;" )
-    found=$($mysqlDB -N -B -e "select max(valid_until) from daq_configurations join telescopes on telescope_id = telescopes.id  where telescopes.name='$telID' group by telescopes.name;" )
+	found=$($mysqlDB -N -B -e "select max(valid_until) from daq_configurations join telescopes on telescope_id = telescopes.id  where telescopes.name='$telID' group by telescopes.name;" )
 #select a.gps_latitude,a.gps_longitude,a.gps_altitude,a.mrpc12_distance,a.mrpc23_distance,a.magnorth_angle,a.geonorth_angle,a.valid_from,a.valid_until,a.telescope_id,telescopes.name from daq_configurations a join telescopes on a.telescope_id = telescopes.id where a.valid_until = ( select max(valid_until) valid_until from daq_configurations b where a.telescope_id = b.telescope_id ) order by a.telescope_id;
-    if [[ -z $found ]]
-    then 
-	continue
-    else
-	lastDBEntryDate=${found% *}
-
-	firstAvailDataDate=""
-	let num=0
-	until [[ -n "$firstAvailDataDate" ]] || [[ "$num" -ge 5 ]]
-	do
-	    let num+=1
-	    offset="$num"
-	    offset+="day"
-
-	    #echo $lastDBEntryDate
-	    dataDate=$(date -d "$lastDBEntryDate+$offset" "+%F")
-	    #echo /data/$telID/data/$dataDate
-	    if [[ -d /data/$telID/data/$dataDate ]]
-	    then
-		#echo "Trovata directory /data/$telID/data/$dataDate"
-		firstAvailDataDate="$dataDate"
-	    fi
-	done
-    fi
-
-    #echo "Now is $curFirstAvailDataDate"
-    if [[ -z "$curFirstAvailDataDate" ]] || [[ ! -z $firstAvailDataDate && "$firstAvailDataDate" < "$curFirstAvailDataDate" ]]
-    then
-	curFirstAvailDataDate="$firstAvailDataDate"
-	lastAnDate="$lastDBEntryDate"
-	lastAnDateTelID="$telID"
-	#echo "Updated to $curFirstAvailDataDate"
-    fi
+	if [[ -z $found ]]
+	then 
+	    continue
+	else
+	    lastDBEntryDate=${found% *}
 	    
-done
-anDate=$curFirstAvailDataDate
+	    firstAvailDataDate=""
+	    let num=0
+	    until [[ -n "$firstAvailDataDate" ]] || [[ "$num" -ge 365 ]]
+	    do
+		let num+=1
+		offset="$num"
+		offset+="day"
+		
+	        #echo $lastDBEntryDate
+		dataDate=$(date -d "$lastDBEntryDate+$offset" "+%F")
+	        #echo /data/$telID/data/$dataDate
+		if [[ -d /data/$telID/data/$dataDate ]]
+		then
+		    #echo "Found data directory /data/$telID/data/$dataDate"
+		    numOfBinFiles=$(ls /data/$telID/data/$dataDate | wc -w)
+		    if [ $numOfBinFiles -gt 0 ]
+		    then
+                        #echo "Number of binary files $numOfBinFiles"
+			firstAvailDataDate="$dataDate"
+			break
+		    fi
+		fi
+	    done
+	fi
+	
+        #echo "Now is $curFirstAvailDataDate"
+	if [[ -z "$curFirstAvailDataDate" ]] || [[ ! -z $firstAvailDataDate && "$firstAvailDataDate" < "$curFirstAvailDataDate" ]]
+	then
+	    curFirstAvailDataDate="$firstAvailDataDate"
+	    lastAnDate="$lastDBEntryDate"
+	    lastAnDateTelID="$telID"
+	    #echo "Updated to $curFirstAvailDataDate"
+	fi
+	
+    done
+    anDate=$curFirstAvailDataDate
+    
+    if [[ -z $anDate ]] 
+    then
+	echo -e "[WARNING] No entry found in DB. Starting from 2015-10-27."
+	anDate="2015-10-28"
+    else
+	echo -e "[INFO] Oldest record in DB for station $lastAnDateTelID: data are valid until $lastAnDate, raw data directory for day $anDate exists."
+    fi
+fi
 
-if [[ -z $anDate ]] 
-then
-    echo -e "[WARNING] No entry found in DB. Starting from 2015-10-27."
-    anDate="2015-10-28"
-else
-    echo -e "[INFO] Oldest record in DB for station $lastAnDateTelID: data are valid until $lastAnDate, raw data directory for day $anDate exists."
-fi
-fi
 #----------------------------------------------------------------------------------------------
 # Get parameteres values from RAW data directory
 #----------------------------------------------------------------------------------------------
@@ -206,8 +222,8 @@ do
 	    stdqlistfile="./daqConfListFromData"
 	    stdqlistfile+="_$telID"
 	    stdqlistfile+=".csv"
+	    let TOTANFILE=0
 
-	    rawDataFound="false"
 	    BINDIRS1=$($CMD0 /data/$telID/data/ | $CMD2)	    
 	    for dirname in $BINDIRS1
 	    do
@@ -219,7 +235,6 @@ do
 
 		if [[ "$dirname" == "$anDate" ]]
 		then
-		    rawDataFound="true"
 
 		    BINDIRS2=$($CMD1 /data/$telID/data/$dirname | $CMD2)
 		    echo -e "[INFO] Analysing raw data for date $dirname"
@@ -228,16 +243,19 @@ do
 
 		    for filenamewpath in $BINDIRS2
 		    do
+
+                        #limit on maximum number of bin files
+			if [ $TOTANFILE -gt 1000 ]
+			then
+			    break
+			fi
+
 			FEXT=$(echo "$filenamewpath" | awk -F "." '{print $NF}')
 			if [ "$FEXT" == "bin" ]
 			then
 			    
 			    FILEID=$(echo "$filenamewpath" | awk -F "." '{print $1}')
 			    FILEID=$(echo "$FILEID" | awk -F "-" '{print $NF}')
-			    if [ $FILEID -gt 100 ]
-			    then
-				continue
-			    fi
 
 			    YEAR=$(echo "$filenamewpath" | awk -F "/" '{print $5}')
 			    YEAR=$(echo "$YEAR" | awk -F "-" '{print $1}')
@@ -260,11 +278,13 @@ do
 			fi
 	   	
 		    done
+
+		break
 		fi
 		
 	    done
 		       		   
-	    if [[ $rawDataFound == "false" ]] 
+	    if [ $TOTANFILE -eq 0 ] 
 	    then
 		echo -e "[WARNING] No raw data found for date $anDate. Skipping to next station ..."				
 		continue
@@ -351,11 +371,14 @@ do
 		mysqlCMD+="$dbEntriesFile"
 		mysqlCMD+="' into table daq_configurations fields terminated by ','  lines terminated by '\n' (gps_latitude,gps_longitude,gps_altitude,mrpc12_distance,mrpc23_distance,magnorth_angle,geonorth_angle,valid_from,valid_until,telescope_id)"
 		$mysqlDB -e "$mysqlCMD"
-		
+	
 	    fi
+
 	fi
 	
     done
+
+    stdqlistfile+=".tmp"
 
     if [[ $stationFound == "false" ]] 
     then
@@ -363,3 +386,5 @@ do
     fi
 
 done
+
+rm -f exec.tmp
