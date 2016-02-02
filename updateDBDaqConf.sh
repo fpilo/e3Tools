@@ -106,6 +106,7 @@ fi
 #----------------------------------------------------------------------------------------------
 echo -e "\n2 - Selecting starting date according to DB entries ..."
 BINDIRS0=$($CMD0 /data/ | $CMD2)
+TODAYDATE=$(date "+%F")
 
 if [[ ! -z $2 ]]
 then
@@ -129,19 +130,22 @@ else
 	    until [[ -n "$firstAvailDataDate" ]] || [[ "$num" -ge 365 ]]
 	    do
 		let num+=1
+
 		offset="$num"
-		offset+="day"
-		
-	        #echo $lastDBEntryDate
+		offset+="day"		
 		dataDate=$(date -d "$lastDBEntryDate+$offset" "+%F")
-	        #echo /data/$telID/data/$dataDate
+		#break if current day
+		if [[ "$dataDate" == "$TODAYDATE" ]]
+		then
+		    break
+		fi
+
+		#good next available date if directory and binaries exist
 		if [[ -d /data/$telID/data/$dataDate ]]
 		then
-		    #echo "Found data directory /data/$telID/data/$dataDate"
-		    numOfBinFiles=$(ls /data/$telID/data/$dataDate | wc -w)
+		    numOfBinFiles=$(ls /data/$telID/data/$dataDate/$telID-$dataDate-*.bin | wc -w)
 		    if [ $numOfBinFiles -gt 0 ]
 		    then
-                        #echo "Number of binary files $numOfBinFiles"
 			firstAvailDataDate="$dataDate"
 			break
 		    fi
