@@ -553,7 +553,7 @@ int e3DataBlock::getVWSData(){
 //---------------------------------------------------------
 // e3DataBlock getNextBlock method
 //---------------------------------------------------------
-int e3DataBlock::getNextBlock(){
+int e3DataBlock::getNextBlock(bool noDump){
 
   unsigned int readBytes, readBlocks; //blockSize, dataType;
   unsigned int anBytes;
@@ -609,14 +609,15 @@ int e3DataBlock::getNextBlock(){
 	getGPSData(&_gpsData);
 	if(!_specialDump) _gpsData.dump();
 	//	else if(_gpsData.getSecondsOfDay()-(int)(_gpsData.getSecondsOfDay()/60)*60==0) {       
-	else{
+	else if(!noDump){
 
 	  //Dump only one GPS block per minute
 	  cout<<fixed;
 	  cout<<_inFileName<<",";
-	  cout.precision(6); cout<<_gpsData.getLatitudeDeg()+(float)((_gpsData.getLatitudeMin()+_gpsData.getLatitudeMinFrac()/1000.)/60.)<<",";
-	  cout.precision(6); cout<<_gpsData.getLongitudeDeg()+(float)((_gpsData.getLongitudeMin()+_gpsData.getLongitudeMinFrac()/1000.)/60.)<<",";
+	  cout.precision(7); cout<<_gpsData.getLatitudeDeg()+(float)((_gpsData.getLatitudeMin()+_gpsData.getLatitudeMinFrac()/1000.)/60.)<<",";
+	  cout.precision(7); cout<<_gpsData.getLongitudeDeg()+(float)((_gpsData.getLongitudeMin()+_gpsData.getLongitudeMinFrac()/1000.)/60.)<<",";
 	  cout.precision(0); cout<<_gpsData.getAltitude()<<",";
+	  cout.precision(0); cout<<_gpsData.getNumOfVisSat()<<",";
 	  cout.fill('0'); cout.width(3); cout.precision(2); cout<<geoData.getDist12()<<",";
 	  cout.fill('0'); cout.width(3); cout.precision(2); cout<<geoData.getDist23()<<",";
 	  cout.fill('0'); cout.width(4); cout.precision(1); cout<<geoData.getGrAngle()<<",";

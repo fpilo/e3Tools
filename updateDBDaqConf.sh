@@ -1,7 +1,10 @@
 #!/bin/bash
 #This utility loop into /data and create one row in a list for each *.bin file
-#v1.4
+#v1.7
 #
+#2016-02-09 v1.7: improvement: daq_id in telescopes table updated
+#2016-02-04 v1.6: improvement: last Db entry is deleted right before new entries upload
+#2016-02-02 v1.5: bug fix: next available data is selected only if is not current day. Added visible satellites (config. change if less than 6)
 #2016-01-29 v1.4: bug fix: next available data is selected only if .bin data are available in the existing directory
 #2016-01-28 v1.3: bug fix: dbEntries file is no more created if List file is empty (TOTANFILE=0)
 #2016-01-26 v1.2: tmp files are moved to csv at the end to indicate that the process is ongoing
@@ -118,7 +121,7 @@ else
 	
 #    found=$($mysqlDB -N -B -e "select valid_until from daq_configurations join telescopes on telescope_id = telescopes.id where telescopes.name='$telID' order by valid_until desc limit 1 ;" )
 	found=$($mysqlDB -N -B -e "select max(valid_until) from daq_configurations join telescopes on telescope_id = telescopes.id  where telescopes.name='$telID' group by telescopes.name;" )
-#select a.gps_latitude,a.gps_longitude,a.gps_altitude,a.mrpc12_distance,a.mrpc23_distance,a.magnorth_angle,a.geonorth_angle,a.valid_from,a.valid_until,a.telescope_id,telescopes.name from daq_configurations a join telescopes on a.telescope_id = telescopes.id where a.valid_until = ( select max(valid_until) valid_until from daq_configurations b where a.telescope_id = b.telescope_id ) order by a.telescope_id;
+#select a.gps_latitude,a.gps_longitude,a.gps_altitude,a.gps_vis_satellites,a.mrpc12_distance,a.mrpc23_distance,a.magnorth_angle,a.geonorth_angle,a.valid_from,a.valid_until,a.telescope_id,telescopes.name from daq_configurations a join telescopes on a.telescope_id = telescopes.id where a.valid_until = ( select max(valid_until) valid_until from daq_configurations b where a.telescope_id = b.telescope_id ) order by a.telescope_id;
 	if [[ -z $found ]]
 	then 
 	    continue
@@ -196,7 +199,7 @@ do
 
 	if [[ "$anDate" > "$lastFoundDate" ]]
 	then
-	    lastDBEntry=$($mysqlDB -N -B -e "select gps_latitude,gps_longitude,gps_altitude,mrpc12_distance,mrpc23_distance,magnorth_angle,geonorth_angle,valid_from,valid_until,telescope_id from daq_configurations where telescope_id=$dbTelID order by valid_until desc limit 1 ;" | sed 's/\t/,/g')
+	    lastDBEntry=$($mysqlDB -N -B -e "select gps_latitude,gps_longitude,gps_altitude,gps_vis_satellites,mrpc12_distance,mrpc23_distance,magnorth_angle,geonorth_angle,valid_from,valid_until,telescope_id from daq_configurations where telescope_id=$dbTelID order by valid_until desc limit 1 ;" | sed 's/\t/,/g')
 	    #echo $lastDBEntry
 	else
 	    echo -e "[INFO] Parameters already updated up to $lastFoundDate. Skipping to next station ..."
@@ -295,6 +298,7 @@ do
 	    else
 		echo -e "\n5 - $telID - Creating daqConfEntries files ... "	 
 		
+		sed -i".bak" '/ABORTED/d' $stdqlistfile #Remove "ABORTED runs" entries from input file
 		totLines=$(wc -l < $stdqlistfile)
 		echo -e "[INFO] Total number of lines to be analysed: $totLines"				
 		dbEntriesFile="./daqConfEntries"
@@ -306,16 +310,15 @@ do
 		if [[ ! -z $lastDBEntry ]]
 		then
 		    echo "[INFO] Last DB entry: $lastDBEntry"
-		    $mysqlDB -N -B -e "delete quick from daq_configurations where telescope_id='$dbTelID' order by valid_until desc limit 1;"
 		fi
 		
 		gawk 'BEGIN { 
                                split("'"$lastDBEntry"'",curft,",");
-                               curgps_latitude = curft[1]; curgps_longitude = curft[2]; curgps_altitude = curft[3]; 
-                               curmrpc12_distance = curft[4]; curmrpc23_distance = curft[5]; 
-                               curmagnorth_angle = curft[6]; curgeonorth_angle = curft[7]; 
-                               curlow_datetime = curft[8]; curup_datetime = curft[9]; curdbTelID = curft[10];
-#printf "%.6f,%.6f,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,curup_datetime,curdbTelID;
+                               curgps_latitude = curft[1]; curgps_longitude = curft[2]; curgps_altitude = curft[3]; curgps_vis_satellites = curft[4]; 
+                               curmrpc12_distance = curft[5]; curmrpc23_distance = curft[6]; 
+                               curmagnorth_angle = curft[7]; curgeonorth_angle = curft[8]; 
+                               curlow_datetime = curft[9]; curup_datetime = curft[10]; curdbTelID = curft[11];
+#printf "%.6f,%.6f,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,cur_vis_satellites,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,curup_datetime,curdbTelID;
                             }
 
                             {
@@ -325,12 +328,19 @@ do
                                }
 
                                split($0,ft,",");
-                               filenamewpath = ft[1]; gps_latitude = ft[2]; gps_longitude = ft[3]; gps_altitude = ft[4]; mrpc12_distance = ft[5]; mrpc23_distance = ft[6]; magnorth_angle = 0; geonorth_angle = ft[7]; date = ft[8]; time = ft[9];
+                               filenamewpath = ft[1]; gps_latitude = ft[2]; gps_longitude = ft[3]; gps_altitude = ft[4];  gps_vis_satellites = ft[5]; mrpc12_distance = ft[6]; mrpc23_distance = ft[7]; magnorth_angle = 0; geonorth_angle = ft[8]; date = ft[9]; time = ft[10];
 
                                if(date=="1995-12-31" && time=="00:00:00"){
                                  gpsSync=0;
+                                 elapsed_seconds=0;
                                }
                                else{
+
+                                 mydatetime=date " " time;
+                                 gsub(/[-:]/," ",mydatetime);
+                                 elapsed_seconds=mktime(mydatetime)-last_update_sec;
+#printf " %d\n",elapsed_seconds;
+
                                  curup_datetime=date " " time;
                                  gpsSync=1;
                                }
@@ -344,6 +354,7 @@ do
                                 if(gps_latitude!=curgps_latitude){ newCfg++; }
                                 if(gps_longitude!=curgps_longitude){ newCfg++; }
                                 if(gps_altitude!=curgps_altitude){ newCfg++; }
+                                if(gps_vis_satellites!=curgps_vis_satellites){ newCfg++; }
                                 if(mrpc12_distance!=curmrpc12_distance){ newCfg++; }
                                 if(mrpc23_distance!=curmrpc23_distance){ newCfg++; }
                                 if(magnorth_angle!=curmagnorth_angle){ newCfg++; }
@@ -352,15 +363,19 @@ do
                                 if(newCfg>0){
 
                                   if(gpsSync==1){
-                                    printf "%.6f,%.6f,%d,%.2f,%.2f,%.1f,%.1f,%s,%s %s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,date,time,"'"$dbTelID"'"; 
-                                    curlow_datetime=date " " time; 
+                                     printf "%.7f,%.7f,%d,%d,%.2f,%.2f,%.1f,%.1f,%s,%s %s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curgps_vis_satellites,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,date,time,"'"$dbTelID"'"; 
+                                     curlow_datetime=date " " time; 
                                   }
                                   if(gpsSync==0){
-                                    printf "%.6f,%.6f,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,curup_datetime,"'"$dbTelID"'"; 
+                                    printf "%.7f,%.7f,%d,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curgps_vis_satellites,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,curup_datetime,"'"$dbTelID"'";
                                     curlow_datetime=curup_datetime; 
                                   }
 
-                                  curgps_latitude = gps_latitude; curgps_longitude = gps_longitude; curgps_altitude = gps_altitude;
+                                  curlow_datetime_formatted = curlow_datetime;
+                                  gsub(/[-:]/," ",curlow_datetime_formatted);
+                                  last_update_sec=mktime(curlow_datetime_formatted);
+
+                                  curgps_latitude = gps_latitude; curgps_longitude = gps_longitude; curgps_altitude = gps_altitude;  curgps_vis_satellites = gps_vis_satellites;
                                   curmrpc12_distance = mrpc12_distance; curmrpc23_distance = mrpc23_distance;
                                   curmagnorth_angle = magnorth_angle; curgeonorth_angle = geonorth_angle;
 
@@ -368,21 +383,32 @@ do
                            } 
 
                           END {
-                             printf "%.6f,%.6f,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,"'"$updatetime"'","'"$dbTelID"'"; 
+                             printf "%.6f,%.6f,%d,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curgps_vis_satellites,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,"'"$updatetime"'","'"$dbTelID"'"; 
                           }' $stdqlistfile >> $dbEntriesFile
-  		
+
+		if [[ ! -z $lastDBEntry ]]
+		then
+		    $mysqlDB -N -B -e "delete quick from daq_configurations where telescope_id='$dbTelID' order by valid_until desc limit 1;"
+		fi  		
+
+		echo -e "\n6 - $telID - Updating database ... "	 
+
 		mysqlCMD="load data local infile '"
 		mysqlCMD+="$dbEntriesFile"
-		mysqlCMD+="' into table daq_configurations fields terminated by ','  lines terminated by '\n' (gps_latitude,gps_longitude,gps_altitude,mrpc12_distance,mrpc23_distance,magnorth_angle,geonorth_angle,valid_from,valid_until,telescope_id)"
+		mysqlCMD+="' into table daq_configurations fields terminated by ','  lines terminated by '\n' (gps_latitude,gps_longitude,gps_altitude,gps_vis_satellites,mrpc12_distance,mrpc23_distance,magnorth_angle,geonorth_angle,valid_from,valid_until,telescope_id)"
 		$mysqlDB -e "$mysqlCMD"
 	
+		mysqlCMD="update telescopes set daq_id = (select max(id) from daq_configurations where telescope_id="
+                mysqlCMD+="$dbTelID"
+                mysqlCMD+=" group by telescopes.name) where id="
+                mysqlCMD+="$dbTelD"
+		$mysqlDB -e "$mysqlCMD"
+
 	    fi
 
 	fi
 	
     done
-
-    stdqlistfile+=".tmp"
 
     if [[ $stationFound == "false" ]] 
     then
@@ -391,4 +417,5 @@ do
 
 done
 
+echo -e "[INFO] I'm done! Exiting ..."
 rm -f exec.tmp

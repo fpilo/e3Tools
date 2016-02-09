@@ -271,7 +271,7 @@ class e3DataBlock : public TObject {
   int getGEOData(void);
   int getWADData(void);
   int getVWSData(void);
-  int getNextBlock();
+  int getNextBlock(bool noDump=false);
   int getNextEvent(e3RawEvent *);
   void dump(char *, unsigned int, unsigned int);
 

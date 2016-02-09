@@ -75,12 +75,27 @@ int main(int argc, char **argv)
   _inFile.open(BFNAME.c_str(), ios_base::in | ios_base::binary);  
   _e3DataBlock.openBinFile(&_inFile);
 
+  if(SPECIALDUMP)
+    _readBlocks=0;
+  bool _noDump=true;
+  while(_readBlocks<BLKSTOREAD){
+    _ret=_e3DataBlock.getNextBlock(_noDump);
+    if(!_ret) _readBlocks++;
+    
+    if(_readBlocks>5) break;
+    if(_ret==1){
+      cout<<"[e3BinDump.exe - WARNING]  Run ABORTED, with "<<_readBlocks<<" blocks"<<endl;
+      exit(EXIT_FAILURE);
+    }  
+  }
+
   _readBlocks=0;
   while(_readBlocks<BLKSTOREAD){
     _ret=_e3DataBlock.getNextBlock();
     if(!_ret) _readBlocks++;
     else if(_ret==1){
       if(!SPECIALDUMP) cout<<"[e3BinDump.exe - WARNING] Read Blocks returned: "<<_ret<<" - End of file reached. Total analysed blocks: "<<_readBlocks<<endl;
+      else if(_readBlocks==5) cout<<"ABORTED"<<endl;
       exit(EXIT_SUCCESS);
     }
     else{
