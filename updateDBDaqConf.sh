@@ -1,8 +1,9 @@
 #!/bin/bash
 #This utility loop into /data and create one row in a list for each *.bin file
-#v1.7
+#v2.0
 #
-#2016-02-09 v1.7: improvement: daq_id in telescopes table updated
+#2016-02-23 v2.0: visible satellite field added; configuration is not saved if sat<5 for less than 30 sec.
+#2016-02-09 v1.7: improvement: DAQ configuration ID (daq_id) in telescopes table updated
 #2016-02-04 v1.6: improvement: last Db entry is deleted right before new entries upload
 #2016-02-02 v1.5: bug fix: next available data is selected only if is not current day. Added visible satellites (config. change if less than 6)
 #2016-01-29 v1.4: bug fix: next available data is selected only if .bin data are available in the existing directory
@@ -311,7 +312,7 @@ do
 		then
 		    echo "[INFO] Last DB entry: $lastDBEntry"
 		fi
-		
+
 		gawk 'BEGIN { 
                                split("'"$lastDBEntry"'",curft,",");
                                curgps_latitude = curft[1]; curgps_longitude = curft[2]; curgps_altitude = curft[3]; curgps_vis_satellites = curft[4]; 
@@ -338,7 +339,7 @@ do
 
                                  mydatetime=date " " time;
                                  gsub(/[-:]/," ",mydatetime);
-                                 elapsed_seconds=mktime(mydatetime)-last_update_sec;
+                                 elapsed_seconds=mktime(mydatetime)-last_update;
 #printf " %d\n",elapsed_seconds;
 
                                  curup_datetime=date " " time;
@@ -373,7 +374,7 @@ do
 
                                   curlow_datetime_formatted = curlow_datetime;
                                   gsub(/[-:]/," ",curlow_datetime_formatted);
-                                  last_update_sec=mktime(curlow_datetime_formatted);
+                                  last_update=mktime(curlow_datetime_formatted);
 
                                   curgps_latitude = gps_latitude; curgps_longitude = gps_longitude; curgps_altitude = gps_altitude;  curgps_vis_satellites = gps_vis_satellites;
                                   curmrpc12_distance = mrpc12_distance; curmrpc23_distance = mrpc23_distance;
@@ -385,6 +386,73 @@ do
                           END {
                              printf "%.6f,%.6f,%d,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",curgps_latitude,curgps_longitude,curgps_altitude,curgps_vis_satellites,curmrpc12_distance,curmrpc23_distance,curmagnorth_angle,curgeonorth_angle,curlow_datetime,"'"$updatetime"'","'"$dbTelID"'"; 
                           }' $stdqlistfile >> $dbEntriesFile
+
+		gawk 'BEGIN { iline=0;
+                            }
+
+                            {
+                               split($0,ft,",");
+                               gps_latitude[iline] = ft[1]; gps_longitude[iline] = ft[2]; gps_altitude[iline] = ft[3];  gps_vis_satellites[iline] = ft[4]; 
+                               mrpc12_distance[iline] = ft[5]; mrpc23_distance[iline] = ft[6]; magnorth_angle[iline] = ft[7]; geonorth_angle[iline] = ft[8]; low_datetime[iline] = ft[9]; up_datetime[iline] = ft[10]; telID[iline] = ft[11];
+
+                               if( iline == 1 ){
+
+
+                                 newCfg=0;
+                                 #Check different cfg
+                                 if(gps_latitude[1]!=gps_latitude[0]){ newCfg++; }
+                                 if(gps_longitude[1]!=gps_longitude[0]){ newCfg++; }
+                                 if(gps_altitude[1]!=gps_altitude[0]){ newCfg++; }
+                                 if(gps_vis_satellites[1]<5 || gps_vis_satellites[0]<5){ newCfg++; }
+                                  if(mrpc12_distance[1]!=mrpc12_distance[0]){ newCfg++; }
+                                 if(mrpc23_distance[1]!=mrpc23_distance[0]){ newCfg++; }
+                                 if(magnorth_angle[1]!=magnorth_angle[0]){ newCfg++; }
+                                 if(geonorth_angle[1]!=geonorth_angle[0]){ newCfg++; }
+
+                                 if(newCfg>0){
+
+                                  curlow_datetime_formatted = low_datetime[1];
+                                  gsub(/[-:]/," ",curlow_datetime_formatted);
+                                  curlow_datetime_sec=mktime(curlow_datetime_formatted);
+
+                                  curup_datetime_formatted = up_datetime[1];
+                                  gsub(/[-:]/," ",curup_datetime_formatted);
+                                  curup_datetime_sec=mktime(curup_datetime_formatted);
+
+                                  if( gps_vis_satellites[1] < 4 && ( curup_datetime_sec - curlow_datetime_sec < 30 ) ){
+
+                                     up_datetime[0] = up_datetime[1];
+                                     iline=0;
+
+                                  }
+                                  else{
+
+                                     printf "%.7f,%.7f,%d,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",gps_latitude[0],gps_longitude[0],gps_altitude[0],gps_vis_satellites[0],mrpc12_distance[0],mrpc23_distance[0],magnorth_angle[0],geonorth_angle[0],low_datetime[0],up_datetime[0],telID[0];
+
+                                     gps_latitude[0] = gps_latitude[1]; gps_longitude[0] = gps_longitude[1]; gps_altitude[0] = gps_altitude[1]; gps_vis_satellites[0] = gps_vis_satellites[1]; 
+                                     mrpc12_distance[0] = mrpc12_distance[1]; mrpc23_distance[0] = mrpc23_distance[1]; magnorth_angle[0] = magnorth_angle[1]; geonorth_angle[0] = geonorth_angle[1]; 
+                                     low_datetime[0] = low_datetime[1]; up_datetime[0] = up_datetime[1]; telID[0] = telID[1];
+                                     iline=0;
+                                  
+                                   }
+}
+else{
+                                     up_datetime[0] = up_datetime[1];
+                                     iline=0;
+
+}
+
+                               }
+
+                               iline++; 
+
+                           } 
+
+                          END {
+                                     printf "%.7f,%.7f,%d,%d,%.2f,%.2f,%.1f,%.1f,%s,%s,%s\n",gps_latitude[0],gps_longitude[0],gps_altitude[0],gps_vis_satellites[0],mrpc12_distance[0],mrpc23_distance[0],magnorth_angle[0],geonorth_angle[0],low_datetime[0],up_datetime[0],telID[0];
+                          }' $dbEntriesFile >> tmp.csv
+		
+		mv tmp.csv $dbEntriesFile
 
 		if [[ ! -z $lastDBEntry ]]
 		then
@@ -402,6 +470,7 @@ do
                 mysqlCMD+="$dbTelID"
                 mysqlCMD+=" group by telescopes.name) where id="
                 mysqlCMD+="$dbTelD"
+
 		$mysqlDB -e "$mysqlCMD"
 
 	    fi
